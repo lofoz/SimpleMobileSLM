@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">SLM</string>
+    <string name="start">Start</string>
+    <string name="db_spl">dB SPL</string>
+    <string name="dba">dBA</string>
+    <string name="hz">Hz</string>
+</resources>

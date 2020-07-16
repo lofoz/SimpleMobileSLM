@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "145669725158",
+    "firebase_url": "https://sounddb-2c346.firebaseio.com",
+    "project_id": "sounddb-2c346",
+    "storage_bucket": "sounddb-2c346.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:145669725158:android:715bc77fb40ab8f87bd427",
+        "android_client_info": {
+          "package_name": "com.example.slm"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "145669725158-31qvjk5mhsvpb6cntlptv6h5ii3ope9g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxKWPa4z07N_eBkEMpErlJjHdIddnctec"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "145669725158-31qvjk5mhsvpb6cntlptv6h5ii3ope9g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
