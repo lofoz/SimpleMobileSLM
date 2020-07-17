@@ -60,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
     FirebaseFirestore db;
     List<Double> A = new ArrayList<>();
 
-    int bufferSize = 11025;
+    int bufferSize = 22050;
     int sampleRate = 44100;
 
     @Override
@@ -264,7 +264,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean process(AudioEvent audioEvent) {
                 float[] audioFloatBuffer = audioEvent.getFloatBuffer();
-                float[] transformbuffer = new float[bufferSize * 2];
+                float[] transformbuffer = new float[bufferSize];
                 System.arraycopy(audioFloatBuffer, 0, transformbuffer, 0, audioFloatBuffer.length);
                 fft.forwardTransform(transformbuffer);
                 fft.modulus(transformbuffer, amplitudes);
@@ -275,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         addEntry((int) dBA, 1);
                         TextView text = findViewById(R.id.dBAView);
-                        text.setText("" + dBA);
+                        text.setText("" + dBA + "dBA");
                     }
                 });
                 return true;
@@ -380,24 +380,28 @@ public class MainActivity extends AppCompatActivity {
 //        return value;
 //    }
 
+    //amplitudes.length = bufferSize/2  -> HzPerBin = sampleRate/(2*amplitudes.length)
     int estimateLevel(float[] amplitudes) {
         int dBA;
-        for (int i = 0; i < amplitudes.length / 2; i++) {
+        for (int i = 0; i < amplitudes.length; i++) {
             if (amplitudes[i] == 0) amplitudes[i] = (float) Math.pow(10, -17);
         }
-        double totalEnergy = 0;
-        for (int i = 0; i < amplitudes.length / 2; i++) {
-            double sum = 0;
-            for (double v : A) {
-                sum += Math.pow(amplitudes[i] * v, 2);
-            }
-//            sum  = Math.pow(amplitudes[i]*A.get(i), 2);
-            totalEnergy += (sum / amplitudes.length * 2);
-//            totalEnergy += sum;
+        float totalEnergy = 0;
+        for (int i = 10; i < amplitudes.length; i++) {
+//            double sum = 0;
+//            for (double v : A) {
+//                sum += Math.pow(amplitudes[i] * v, 2);
+//            }
+            //dBA
+            totalEnergy  += Math.pow(amplitudes[i]/amplitudes.length*A.get(i), 2);
+
+            //dB SPL
+//            totalEnergy  += Math.pow(amplitudes[i]/amplitudes.length, 2);
+//            totalEnergy += (sum / amplitudes.length * 2);
         }
 
-        totalEnergy = totalEnergy/((1/(double)44100)*amplitudes.length*2);
-        dBA = (int) (10 * Math.log10(totalEnergy));
+//        totalEnergy = totalEnergy/((1/(double)44100)*amplitudes.length*2);
+        dBA = (int) (10 * Math.log10(totalEnergy*2500000000.0));
         return dBA;
     }
 
