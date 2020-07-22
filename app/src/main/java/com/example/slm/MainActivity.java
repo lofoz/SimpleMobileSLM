@@ -84,13 +84,13 @@ public class MainActivity extends AppCompatActivity {
         initial, run, stop
     }
 
-    String UserID = "";
+    String userID = "";
     LineChart lineChart;
     AudioDispatcher dispatcher;
-    FirebaseFirestore db = FirebaseFirestore.getInstance();
-    List<Double> A = new ArrayList<>();
+    FirebaseFirestore db;
+    List<Double> A;
     //    Map<String, ArrayList<Float>> soundSignal = new HashMap<>();
-    JSONObject jsonObject = new JSONObject();
+    JSONObject jsonObject;
     StorageReference mStorageRef;
     ProgressBar progressBar;
 
@@ -104,6 +104,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int uploadNum = 100;
     private static int uploadCount = 0;
     private static final int stopNum = 1;
+    private static final String soundDataName = "SoundData.json";
+    private static final String userIDName = "UserID.json";
 
 
     @Override
@@ -111,21 +113,27 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+
+        db = FirebaseFirestore.getInstance();
+        mStorageRef = FirebaseStorage.getInstance().getReference();
+        A = new ArrayList<>();
+
+
         progressBar = findViewById(R.id.progressBar);
         progressBar.setMax(initialNum);
         progressBar.setProgress(initialCount);
         progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
         lineChart = findViewById(R.id.chart);
         lineChart.setBackgroundColor(Color.WHITE);
-        lineChart.setData(new LineData());
         lineChart.getLegend().setForm(Legend.LegendForm.LINE);
         lineChart.invalidate();
-        JSONObject obj;
-        JSONArray array;
 
+        final Button startButton = findViewById(R.id.startButton);
+
+        startButton.setEnabled(false);
 
         try {
-            InputStream inputStream = MainActivity.this.openFileInput("UserID.json");
+            InputStream inputStream = MainActivity.this.openFileInput(userIDName);
 
             if (inputStream != null) {
 //                Toast.makeText(MainActivity.this, "Ok", Toast.LENGTH_SHORT).show();
@@ -140,9 +148,9 @@ public class MainActivity extends AppCompatActivity {
 
                 inputStream.close();
                 JSONObject userObj = new JSONObject(stringBuilder.toString());
-                UserID = userObj.getString("ID");
+                userID = userObj.getString("ID");
 
-                Toast.makeText(MainActivity.this, "UID: " + UserID, Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "UID: " + userID, Toast.LENGTH_SHORT).show();
 
 
             }
@@ -153,41 +161,39 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void onComplete(@NonNull Task<DocumentSnapshot> task) {
                             if (task.isSuccessful()) {
-                                UserID = Integer.toString(Integer.parseInt(task.getResult().get("ID").toString()) + 1);
+                                userID = Integer.toString(Integer.parseInt(task.getResult().get("ID").toString()) + 1);
 
-                                Toast.makeText(MainActivity.this, "First UID: " + UserID, Toast.LENGTH_SHORT).show();
+                                Toast.makeText(MainActivity.this, "First UID: " + userID, Toast.LENGTH_SHORT).show();
 
-                                Log.d("", UserID);
+                                Log.d("", userID);
                                 // Update an existing document
                                 DocumentReference docRef = db.collection("Ver.1").document("Users");
 
                                 // (async) Update one field
-                                docRef.update("ID", UserID);
+                                docRef.update("ID", userID);
 
                                 // Convert JsonObject to String Format
                                 JSONObject userObj = new JSONObject();
                                 try {
-                                    userObj.put("ID", UserID);
+                                    userObj.put("ID", userID);
                                 } catch (JSONException ex) {
                                     ex.printStackTrace();
                                 }
                                 String userString = userObj.toString();
                                 // Define the File Path and its Name
-                                File writeFile = new File(MainActivity.this.getFilesDir(), "UserID.json");
-                                FileWriter fileWriter = null;
+                                File writeFile = new File(MainActivity.this.getFilesDir(), userIDName);
+                                FileWriter fileWriter;
+                                BufferedWriter bufferedWriter;
                                 try {
                                     fileWriter = new FileWriter(writeFile);
-                                } catch (IOException ex) {
-                                    ex.printStackTrace();
-                                }
-                                BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-                                try {
-                                    bufferedWriter.write(userString);
-                                } catch (IOException ex) {
-                                    ex.printStackTrace();
-                                }
-                                try {
-                                    bufferedWriter.close();
+                                    bufferedWriter = new BufferedWriter(fileWriter);
+                                    try {
+                                        bufferedWriter.write(userString);
+                                        bufferedWriter.close();
+
+                                    } catch (IOException ex) {
+                                        ex.printStackTrace();
+                                    }
                                 } catch (IOException ex) {
                                     ex.printStackTrace();
                                 }
@@ -196,27 +202,24 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
                     });
-
-
         } catch (IOException e) {
             Log.e("login activity", "Can not read file: " + e.toString());
         } catch (JSONException e) {
             e.printStackTrace();
-        }
-
-        try {
-            obj = new JSONObject(loadJSONFromAsset(this));
-//            Toast.makeText(this, obj.toString(), Toast.LENGTH_SHORT).show();
-            array = obj.getJSONArray("A");
-            for (int i = 0; i < array.length(); i++) {
-                A.add(Double.parseDouble(array.getString(i)));
+        } finally {
+            try {
+                JSONArray array = new JSONObject(loadJSONFromAsset(this)).getJSONArray("A");
+                for (int i = 0; i < array.length(); i++) {
+                    A.add(Double.parseDouble(array.getString(i)));
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            } finally {
+                //        Toast.makeText(this, Double.toString(A.get(0)), Toast.LENGTH_SHORT).show();
+                startButton.setEnabled(true);
+                addListenerOnStartButton();
             }
-        } catch (JSONException e) {
-            e.printStackTrace();
         }
-//        Toast.makeText(this, Double.toString(A.get(0)), Toast.LENGTH_SHORT).show();
-        addListenerOnStartButton();
-
     }
 
     void addListenerOnStartButton() {
@@ -227,7 +230,10 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onClick(View view) {
                         if (startButton.getText().toString().equals("Start")) {
-                            startButton.setText("Stop");
+                            startButton.setEnabled(false);
+                            startButton.setText("Running");
+                            jsonObject = new JSONObject();
+                            lineChart.setData(new LineData());
                             if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
                                     == PackageManager.PERMISSION_GRANTED) {
 //                            Toast.makeText(MainActivity.this, "Ok", Toast.LENGTH_SHORT).show();
@@ -239,9 +245,8 @@ public class MainActivity extends AppCompatActivity {
                                         new String[]{Manifest.permission.RECORD_AUDIO},
                                         1);
                             }
-                        } else if (startButton.getText().toString().equals("Stop")) {
+                        } else if (startButton.getText().toString().equals("Running")) {
                             dispatcher.stop();
-                            startButton.setText("Start");
                             //                            Toast.makeText(MainActivity.this, "Ok", Toast.LENGTH_SHORT).show();
 
 
@@ -257,46 +262,45 @@ public class MainActivity extends AppCompatActivity {
                             // Convert JsonObject to String Format
                             String userString = jsonObject.toString();
                             // Define the File Path and its Name
-                            File writeFile = new File(MainActivity.this.getFilesDir(), "soundData.json");
-                            FileWriter fileWriter = null;
+                            File writeFile = new File(MainActivity.this.getFilesDir(), soundDataName);
+                            FileWriter fileWriter;
+                            BufferedWriter bufferedWriter;
                             try {
                                 fileWriter = new FileWriter(writeFile);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-                            try {
-                                bufferedWriter.write(userString);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            try {
-                                bufferedWriter.close();
+                                bufferedWriter = new BufferedWriter(fileWriter);
+                                try {
+                                    bufferedWriter.write(userString);
+                                    bufferedWriter.close();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
 
-                            mStorageRef = FirebaseStorage.getInstance().getReference();
-                            Uri readFile = Uri.fromFile(new File(MainActivity.this.getFilesDir(), "soundData.json"));
+                            Uri readFile = Uri.fromFile(new File(MainActivity.this.getFilesDir(), soundDataName));
 
                             final String serverTimestamp = Long.toString(System.currentTimeMillis());
 
-                            final StorageReference soundDataRef = mStorageRef.child("SoundData/" + UserID + "/" + serverTimestamp + ".json");
+                            final StorageReference soundDataRef = mStorageRef.child("SoundData/" + userID + "/" + serverTimestamp + ".json");
 
                             soundDataRef.putFile(readFile)
+                                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                                        @Override
+                                        public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
+                                            uploadCount = (int) ((double) taskSnapshot.getBytesTransferred() / (double) taskSnapshot.getTotalByteCount() * 100.0);
+                                            runOnUiThread(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    progressBar.setProgress(uploadCount);
+                                                }
+                                            });
+                                        }
+                                    })
                                     .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                                         @Override
                                         public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                                             uploadCount = 0;
-                                            runOnUiThread(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    progressBar.setMax(initialNum);
-                                                    progressBar.setProgress(initialCount);
-                                                    progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
-                                                }
-                                            });
-
                                             // Get a URL to the uploaded content
                                             soundDataRef.getDownloadUrl().addOnSuccessListener(
                                                     new OnSuccessListener<Uri>() {
@@ -322,15 +326,13 @@ public class MainActivity extends AppCompatActivity {
                                                             data.put("CPUABI2", Build.CPU_ABI2);
                                                             data.put("SDK_INT", Build.VERSION.SDK_INT);
 
-
-                                                            db = FirebaseFirestore.getInstance();
 //                    Toast.makeText(MainActivity.this, "Here!", Toast.LENGTH_SHORT).show();
 
                                                             db.collection("Ver.1")
                                                                     .document("Manufacturers")
                                                                     .collection(Build.MANUFACTURER)
                                                                     .document(Build.MODEL)
-                                                                    .collection(UserID)
+                                                                    .collection(userID)
                                                                     .document(serverTimestamp)
                                                                     .set(data)
                                                                     .addOnCompleteListener(
@@ -339,6 +341,16 @@ public class MainActivity extends AppCompatActivity {
                                                                                 public void onComplete(@NonNull Task<Void> task) {
                                                                                     if (task.isSuccessful()) {
                                                                                         Toast.makeText(MainActivity.this, "add!", Toast.LENGTH_SHORT).show();
+                                                                                        startButton.setText("Start");
+                                                                                        startButton.setEnabled(true);
+                                                                                        runOnUiThread(new Runnable() {
+                                                                                            @Override
+                                                                                            public void run() {
+                                                                                                progressBar.setMax(initialNum);
+                                                                                                progressBar.setProgress(initialCount);
+                                                                                                progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
+                                                                                            }
+                                                                                        });
                                                                                     } else if (task.isCanceled()) {
                                                                                         Toast.makeText(MainActivity.this, "cancel!", Toast.LENGTH_SHORT).show();
                                                                                     }
@@ -356,20 +368,7 @@ public class MainActivity extends AppCompatActivity {
                                             // Handle unsuccessful uploads
                                             // ...
                                         }
-                                    })
-                                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
-                                        @Override
-                                        public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
-                                            uploadCount = (int) ((double) taskSnapshot.getBytesTransferred() / (double) taskSnapshot.getTotalByteCount() * 100.0);
-                                            runOnUiThread(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    progressBar.setProgress(uploadCount);
-                                                }
-                                            });
-                                        }
                                     });
-
                         }
                     }
                 }
