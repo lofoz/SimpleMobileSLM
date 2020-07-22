@@ -397,6 +397,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void soundDetection() {
+        final List<Integer> dBSPLlist = new ArrayList<>();
+        final List<Integer> dBAlist = new ArrayList<>();
         dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(sampleRate, bufferSize, 0);
 
         AudioProcessor fftProcessor = new AudioProcessor() {
@@ -462,8 +464,8 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                             try {
-                                jsonObject.put("dBSPL" + runCount, dBSPL);
-                                jsonObject.put("dBA" + runCount, dBA);
+                                dBSPLlist.add(dBSPL);
+                                dBAlist.add(dBA);
                                 jsonObject.put(Integer.toString(runCount), result);
                             } catch (JSONException e) {
                                 e.printStackTrace();
@@ -475,6 +477,12 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             });
                         } else {
+                            try {
+                                jsonObject.put("dBSPL", new JSONArray(dBSPLlist));
+                                jsonObject.put("dBA", new JSONArray(dBAlist));
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
