@@ -43,6 +43,7 @@ import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ServerTimestamp;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.google.firestore.v1.DocumentTransform;
@@ -100,6 +101,8 @@ public class MainActivity extends AppCompatActivity {
     private static int initialCount = 0;
     private static final int runNum = 20;
     private static int runCount = 0;
+    private static final int uploadNum = 100;
+    private static int uploadCount = 0;
     private static final int stopNum = 1;
 
 
@@ -284,6 +287,16 @@ public class MainActivity extends AppCompatActivity {
                                     .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                                         @Override
                                         public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                                            uploadCount = 0;
+                                            runOnUiThread(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    progressBar.setMax(initialNum);
+                                                    progressBar.setProgress(initialCount);
+                                                    progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
+                                                }
+                                            });
+
                                             // Get a URL to the uploaded content
                                             soundDataRef.getDownloadUrl().addOnSuccessListener(
                                                     new OnSuccessListener<Uri>() {
@@ -342,6 +355,18 @@ public class MainActivity extends AppCompatActivity {
                                         public void onFailure(@NonNull Exception exception) {
                                             // Handle unsuccessful uploads
                                             // ...
+                                        }
+                                    })
+                                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                                        @Override
+                                        public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
+                                            uploadCount = (int) ((double) taskSnapshot.getBytesTransferred() / (double) taskSnapshot.getTotalByteCount() * 100.0);
+                                            runOnUiThread(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    progressBar.setProgress(uploadCount);
+                                                }
+                                            });
                                         }
                                     });
 
@@ -468,9 +493,9 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void run() {
                                 Button button = findViewById(R.id.startButton);
-                                progressBar.setMax(initialNum);
-                                progressBar.setProgress(initialCount);
-                                progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
+                                progressBar.setMax(uploadNum);
+                                progressBar.setProgress(uploadCount);
+                                progressBar.setProgressTintList(ColorStateList.valueOf(Color.CYAN));
                                 button.performClick();
                             }
                         });
