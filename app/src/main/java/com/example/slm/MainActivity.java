@@ -11,17 +11,16 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.SystemClock;
-import android.util.JsonWriter;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Chronometer;
 import android.widget.ProgressBar;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -36,17 +35,13 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
-import com.google.firebase.database.ServerValue;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.ServerTimestamp;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
-import com.google.firestore.v1.DocumentTransform;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -56,15 +51,11 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -341,8 +332,10 @@ public class MainActivity extends AppCompatActivity {
                                                                                 public void onComplete(@NonNull Task<Void> task) {
                                                                                     if (task.isSuccessful()) {
                                                                                         Toast.makeText(MainActivity.this, "add!", Toast.LENGTH_SHORT).show();
+
                                                                                         startButton.setText("Start");
                                                                                         startButton.setEnabled(true);
+
                                                                                         runOnUiThread(new Runnable() {
                                                                                             @Override
                                                                                             public void run() {
@@ -351,6 +344,27 @@ public class MainActivity extends AppCompatActivity {
                                                                                                 progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
                                                                                             }
                                                                                         });
+
+                                                                                        Uri defaultRingtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+
+                                                                                        MediaPlayer mediaPlayer = new MediaPlayer();
+
+                                                                                        try {
+                                                                                            mediaPlayer.setDataSource(MainActivity.this, defaultRingtoneUri);
+                                                                                            mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
+                                                                                            mediaPlayer.prepare();
+                                                                                            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+
+                                                                                                @Override
+                                                                                                public void onCompletion(MediaPlayer mp)
+                                                                                                {
+                                                                                                    mp.release();
+                                                                                                }
+                                                                                            });
+                                                                                            mediaPlayer.start();
+                                                                                        } catch (IllegalArgumentException | SecurityException | IllegalStateException | IOException e) {
+                                                                                            e.printStackTrace();
+                                                                                        }
                                                                                     } else if (task.isCanceled()) {
                                                                                         Toast.makeText(MainActivity.this, "cancel!", Toast.LENGTH_SHORT).show();
                                                                                     }
