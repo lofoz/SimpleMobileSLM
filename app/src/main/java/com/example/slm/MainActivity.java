@@ -103,7 +103,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int stopNum = 1;
     private static final String soundDataName = "SoundData";
     private static final String userIDName = "UserID.json";
-    private static final String serverTimestamp = Long.toString(System.currentTimeMillis());
+    private static String serverTimestamp;
 
 
     @Override
@@ -234,6 +234,8 @@ public class MainActivity extends AppCompatActivity {
                             startButton.setText("Running");
                             jsonObject = new JSONObject();
                             lineChart.setData(new LineData());
+                            serverTimestamp = Long.toString(System.currentTimeMillis());
+
                             if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
                                     == PackageManager.PERMISSION_GRANTED) {
 //                            Toast.makeText(MainActivity.this, "Ok", Toast.LENGTH_SHORT).show();
@@ -276,11 +278,8 @@ public class MainActivity extends AppCompatActivity {
                             data.put("CPUABI2", Build.CPU_ABI2);
                             data.put("SDK_INT", Build.VERSION.SDK_INT);
 
-                            // write soundData to json
-                            writeSoundDataToJson(null);
-
-                            // upload json file
-                            uploadFileToFirebaseStorage(runNum / runStep);
+                            // write soundData to json, upload json file
+                            writeSoundDataToJsonUploadJsonFile(null);
 
                             uploadCount = 0;
 
@@ -447,7 +446,7 @@ public class MainActivity extends AppCompatActivity {
 
                                     new Thread(new Runnable() {
                                         public void run() {
-                                            writeSoundDataToJson(tJsonObject);
+                                            writeSoundDataToJsonUploadJsonFile(tJsonObject);
                                         }
                                     }).start();
                                 }
@@ -613,7 +612,7 @@ public class MainActivity extends AppCompatActivity {
         return json;
     }
 
-    void writeSoundDataToJson(JSONObject tJsonObject) {
+    void writeSoundDataToJsonUploadJsonFile(JSONObject tJsonObject) {
         // Convert JsonObject to String Format
         String userString = (tJsonObject != null) ? tJsonObject.toString() : jsonObject.toString();
         // Define the File Path and its Name
