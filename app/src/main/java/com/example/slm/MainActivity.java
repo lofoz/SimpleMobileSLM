@@ -15,6 +15,7 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -41,6 +42,7 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
@@ -50,17 +52,26 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import be.tarsos.dsp.AudioDispatcher;
 import be.tarsos.dsp.AudioEvent;
@@ -85,25 +96,25 @@ public class MainActivity extends AppCompatActivity {
     JSONObject jsonObject;
     StorageReference mStorageRef;
     ProgressBar progressBar;
+    private static String serverTimestamp;
 
-    int bufferSize = 22050;
+
+    // 22050 -> 0.5s  4410 -> 0.1s
+    int bufferSize = 4410;
     int sampleRate = 44100;
     ProcessState processState = ProcessState.initial;
-    private static final int initialNum = 4;
+    private static final int initialNum = 20;
     private static int initialCount = 0;
 
-    // change sample time  1200=10min  3600=30min  120=1min
-    private static final int runNum = 3600;
+    // change sample time  6000=10min  18000=30min  600=1min
+    private static final int runNum = 60;
     private static int runCount = 0;
-    // sound data json size
-    private static final int runStep = 20;
-
     private static final int uploadNum = 100;
     private static int uploadCount = 0;
+
     private static final int stopNum = 1;
     private static final String soundDataName = "SoundData";
     private static final String userIDName = "UserID.json";
-    private static String serverTimestamp;
 
 
     @Override
@@ -132,94 +143,113 @@ public class MainActivity extends AppCompatActivity {
 
         startButton.setEnabled(false);
 
+//        try {
+//            InputStream inputStream = MainActivity.this.openFileInput(userIDName);
+//
+//            if (inputStream != null) {
+////                Toast.makeText(MainActivity.this, "Ok", Toast.LENGTH_SHORT).show();
+//                InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
+//                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+//                String receiveString;
+//                StringBuilder stringBuilder = new StringBuilder();
+//
+//                while ((receiveString = bufferedReader.readLine()) != null) {
+//                    stringBuilder.append(receiveString);
+//                }
+//
+//                inputStream.close();
+//                JSONObject userObj = new JSONObject(stringBuilder.toString());
+//                userID = userObj.getString("ID");
+//
+//                Toast.makeText(MainActivity.this, "UID: " + userID, Toast.LENGTH_SHORT).show();
+//
+//
+//            }
+//        } catch (FileNotFoundException e) {
+//            Log.e("login activity", "File not found: " + e.toString());
+//            db.collection("Ver.1").document("Users").get()
+//                    .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+//                        @Override
+//                        public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+//                            if (task.isSuccessful()) {
+//                                userID = Integer.toString(Integer.parseInt(task.getResult().get("ID").toString()) + 1);
+//
+//                                Toast.makeText(MainActivity.this, "First UID: " + userID, Toast.LENGTH_SHORT).show();
+//
+//                                Log.d("", userID);
+//                                // Update an existing document
+//                                DocumentReference docRef = db.collection("Ver.1").document("Users");
+//
+//                                // (async) Update one field
+//                                docRef.update("ID", userID);
+//
+//                                // Convert JsonObject to String Format
+//                                JSONObject userObj = new JSONObject();
+//                                try {
+//                                    userObj.put("ID", userID);
+//                                } catch (JSONException ex) {
+//                                    ex.printStackTrace();
+//                                }
+//                                String userString = userObj.toString();
+//                                // Define the File Path and its Name
+//                                File writeFile = new File(MainActivity.this.getFilesDir(), userIDName);
+//                                FileWriter fileWriter;
+//                                BufferedWriter bufferedWriter;
+//                                try {
+//                                    fileWriter = new FileWriter(writeFile);
+//                                    bufferedWriter = new BufferedWriter(fileWriter);
+//                                    try {
+//                                        bufferedWriter.write(userString);
+//                                        bufferedWriter.close();
+//
+//                                    } catch (IOException ex) {
+//                                        ex.printStackTrace();
+//                                    }
+//                                } catch (IOException ex) {
+//                                    ex.printStackTrace();
+//                                }
+//                            } else {
+//                                Log.w("", "Error getting documents.", task.getException());
+//                            }
+//                        }
+//                    });
+//        } catch (IOException e) {
+//            Log.e("login activity", "Can not read file: " + e.toString());
+//        } catch (JSONException e) {
+//            e.printStackTrace();
+//        } finally {
+//            try {
+//                JSONArray array = new JSONObject(loadJSONFromAsset(this)).getJSONArray("A");
+//                for (int i = 0; i < array.length(); i++) {
+//                    A.add(Double.parseDouble(array.getString(i)));
+//                }
+//            } catch (JSONException e) {
+//                e.printStackTrace();
+//            } finally {
+//                //        Toast.makeText(this, Double.toString(A.get(0)), Toast.LENGTH_SHORT).show();
+//                startButton.setEnabled(true);
+//                addListenerOnStartButton();
+//            }
+//        }
+
         try {
-            InputStream inputStream = MainActivity.this.openFileInput(userIDName);
-
-            if (inputStream != null) {
-//                Toast.makeText(MainActivity.this, "Ok", Toast.LENGTH_SHORT).show();
-                InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-                String receiveString = "";
-                StringBuilder stringBuilder = new StringBuilder();
-
-                while ((receiveString = bufferedReader.readLine()) != null) {
-                    stringBuilder.append(receiveString);
-                }
-
-                inputStream.close();
-                JSONObject userObj = new JSONObject(stringBuilder.toString());
-                userID = userObj.getString("ID");
-
-                Toast.makeText(MainActivity.this, "UID: " + userID, Toast.LENGTH_SHORT).show();
-
-
+            JSONArray array = new JSONObject(loadJSONFromAsset(this)).getJSONArray("A");
+            for (int i = 0; i < array.length(); i++) {
+                A.add(Double.parseDouble(array.getString(i)));
             }
-        } catch (FileNotFoundException e) {
-            Log.e("login activity", "File not found: " + e.toString());
-            db.collection("Ver.1").document("Users").get()
-                    .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-                        @Override
-                        public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                            if (task.isSuccessful()) {
-                                userID = Integer.toString(Integer.parseInt(task.getResult().get("ID").toString()) + 1);
-
-                                Toast.makeText(MainActivity.this, "First UID: " + userID, Toast.LENGTH_SHORT).show();
-
-                                Log.d("", userID);
-                                // Update an existing document
-                                DocumentReference docRef = db.collection("Ver.1").document("Users");
-
-                                // (async) Update one field
-                                docRef.update("ID", userID);
-
-                                // Convert JsonObject to String Format
-                                JSONObject userObj = new JSONObject();
-                                try {
-                                    userObj.put("ID", userID);
-                                } catch (JSONException ex) {
-                                    ex.printStackTrace();
-                                }
-                                String userString = userObj.toString();
-                                // Define the File Path and its Name
-                                File writeFile = new File(MainActivity.this.getFilesDir(), userIDName);
-                                FileWriter fileWriter;
-                                BufferedWriter bufferedWriter;
-                                try {
-                                    fileWriter = new FileWriter(writeFile);
-                                    bufferedWriter = new BufferedWriter(fileWriter);
-                                    try {
-                                        bufferedWriter.write(userString);
-                                        bufferedWriter.close();
-
-                                    } catch (IOException ex) {
-                                        ex.printStackTrace();
-                                    }
-                                } catch (IOException ex) {
-                                    ex.printStackTrace();
-                                }
-                            } else {
-                                Log.w("", "Error getting documents.", task.getException());
-                            }
-                        }
-                    });
-        } catch (IOException e) {
-            Log.e("login activity", "Can not read file: " + e.toString());
         } catch (JSONException e) {
             e.printStackTrace();
         } finally {
-            try {
-                JSONArray array = new JSONObject(loadJSONFromAsset(this)).getJSONArray("A");
-                for (int i = 0; i < array.length(); i++) {
-                    A.add(Double.parseDouble(array.getString(i)));
-                }
-            } catch (JSONException e) {
-                e.printStackTrace();
-            } finally {
-                //        Toast.makeText(this, Double.toString(A.get(0)), Toast.LENGTH_SHORT).show();
-                startButton.setEnabled(true);
-                addListenerOnStartButton();
-            }
+            //        Toast.makeText(this, Double.toString(A.get(0)), Toast.LENGTH_SHORT).show();
+            startButton.setEnabled(true);
+            addListenerOnStartButton();
         }
+
+
+//        HttpURLConnection_Post_Task task = new HttpURLConnection_Post_Task();
+//        task.execute("http://35.201.170.127/update/raw_data");
+
+
     }
 
     void addListenerOnStartButton() {
@@ -229,7 +259,7 @@ public class MainActivity extends AppCompatActivity {
                     @SuppressLint({"SetTextI18n", "HardwareIds", "CommitPrefEdits"})
                     @Override
                     public void onClick(View view) {
-                        if (startButton.getText().toString().equals("Start")) {
+                        if (startButton.getText().toString().equals("START！")) {
                             startButton.setEnabled(false);
                             startButton.setText("Running");
                             jsonObject = new JSONObject();
@@ -279,62 +309,50 @@ public class MainActivity extends AppCompatActivity {
                             data.put("SDK_INT", Build.VERSION.SDK_INT);
 
                             // write soundData to json, upload json file
-                            writeSoundDataToJsonUploadJsonFile(null);
+                            writeSoundDataToJson(null);
 
-                            uploadCount = 0;
-
-
-                            db.collection("Ver.1")
-                                    .document("Manufacturers")
-                                    .collection(Build.MANUFACTURER)
-                                    .document(Build.MODEL)
-                                    .collection(userID)
-                                    .document(serverTimestamp)
-                                    .set(data, SetOptions.merge())
-                                    .addOnCompleteListener(
-                                            new OnCompleteListener<Void>() {
-                                                @Override
-                                                public void onComplete(@NonNull Task<Void> task) {
-                                                    if (task.isSuccessful()) {
-                                                        Toast.makeText(MainActivity.this, "Add!", Toast.LENGTH_SHORT).show();
-
-                                                        startButton.setText("Start");
-                                                        startButton.setEnabled(true);
-
-                                                        runOnUiThread(new Runnable() {
-                                                            @Override
-                                                            public void run() {
-                                                                progressBar.setMax(initialNum);
-                                                                progressBar.setProgress(initialCount);
-                                                                progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
-                                                            }
-                                                        });
-
-                                                        Uri defaultRingtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-
-                                                        MediaPlayer mediaPlayer = new MediaPlayer();
-
-                                                        try {
-                                                            mediaPlayer.setDataSource(MainActivity.this, defaultRingtoneUri);
-                                                            mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
-                                                            mediaPlayer.prepare();
-                                                            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-
-                                                                @Override
-                                                                public void onCompletion(MediaPlayer mp) {
-                                                                    mp.release();
-                                                                }
-                                                            });
-                                                            mediaPlayer.start();
-                                                        } catch (IllegalArgumentException | SecurityException | IllegalStateException | IOException e) {
-                                                            e.printStackTrace();
-                                                        }
-                                                    } else if (task.isCanceled()) {
-                                                        Toast.makeText(MainActivity.this, "Cancel!", Toast.LENGTH_SHORT).show();
-                                                    }
-                                                }
-                                            }
-                                    );
+//                            db.collection("Ver.1")
+//                                    .document("Manufacturers")
+//                                    .collection(Build.MANUFACTURER)
+//                                    .document(Build.MODEL)
+//                                    .collection(userID)
+//                                    .document(serverTimestamp)
+//                                    .set(data, SetOptions.merge())
+//                                    .addOnCompleteListener(
+//                                            new OnCompleteListener<Void>() {
+//                                                @Override
+//                                                public void onComplete(@NonNull Task<Void> task) {
+//                                                    if (task.isSuccessful()) {
+//                                                        Toast.makeText(MainActivity.this, "Add!", Toast.LENGTH_SHORT).show();
+//
+//                                                        startButton.setText("START！");
+//                                                        startButton.setEnabled(true);
+//
+//                                                        Uri defaultRingtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+//
+//                                                        MediaPlayer mediaPlayer = new MediaPlayer();
+//
+//                                                        try {
+//                                                            mediaPlayer.setDataSource(MainActivity.this, defaultRingtoneUri);
+//                                                            mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
+//                                                            mediaPlayer.prepare();
+//                                                            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+//
+//                                                                @Override
+//                                                                public void onCompletion(MediaPlayer mp) {
+//                                                                    mp.release();
+//                                                                }
+//                                                            });
+//                                                            mediaPlayer.start();
+//                                                        } catch (IllegalArgumentException | SecurityException | IllegalStateException | IOException e) {
+//                                                            e.printStackTrace();
+//                                                        }
+//                                                    } else if (task.isCanceled()) {
+//                                                        Toast.makeText(MainActivity.this, "Cancel!", Toast.LENGTH_SHORT).show();
+//                                                    }
+//                                                }
+//                                            }
+//                                    );
 
                         }
                     }
@@ -363,8 +381,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void soundDetection() {
-        final List<Integer> dBSPLlist = new ArrayList<>();
-        final List<Integer> dBAlist = new ArrayList<>();
+        final List<Double> dBSPLlist = new ArrayList<>();
+        final List<Double> dBAlist = new ArrayList<>();
         dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(sampleRate, bufferSize, 0);
 
         AudioProcessor fftProcessor = new AudioProcessor() {
@@ -380,8 +398,8 @@ public class MainActivity extends AppCompatActivity {
                 System.arraycopy(audioFloatBuffer, 0, transformbuffer, 0, audioFloatBuffer.length);
                 fft.forwardTransform(transformbuffer);
                 fft.modulus(transformbuffer, amplitudes);
-                final int dBA = estimateLevel(amplitudes, SPL.dBA);
-                final int dBSPL = estimateLevel(amplitudes, SPL.dBSPL);
+                final double dBA = estimateLevel(amplitudes, SPL.dBA);
+                final double dBSPL = estimateLevel(amplitudes, SPL.dBSPL);
 
                 runOnUiThread(new Runnable() {
                     @SuppressLint("SetTextI18n")
@@ -389,11 +407,11 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         addEntry((int) dBA, 1);
                         TextView text = findViewById(R.id.dBAView);
-                        text.setText("" + dBA + "dBA");
+                        text.setText("" + (int) dBA + "dBA");
 
                         addEntry((int) dBSPL, 0);
-                        TextView text1 = findViewById(R.id.dBSPLView);
-                        text1.setText("" + dBSPL + "dB SPL");
+//                        TextView text1 = findViewById(R.id.dBSPLView);
+//                        text1.setText("" + (int) dBSPL + "dB SPL");
                     }
                 });
 
@@ -421,38 +439,8 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     case run:
                         if (runCount < runNum) {
-                            JSONArray result = new JSONArray();
-                            for (float v : audioFloatBuffer) {
-                                try {
-                                    result.put(v);
-                                } catch (JSONException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-                            try {
-                                dBSPLlist.add(dBSPL);
-                                dBAlist.add(dBA);
-                                jsonObject.put(Integer.toString(runCount), result);
-
-                                // write json
-                                if ((runCount + 1) % runStep == 0 && (runCount + 1) != runNum) {
-                                    jsonObject.put("dBSPL", new JSONArray(dBSPLlist));
-                                    jsonObject.put("dBA", new JSONArray(dBAlist));
-
-                                    final JSONObject tJsonObject = shallowCopy(jsonObject);
-                                    jsonObject = new JSONObject();
-                                    dBSPLlist.clear();
-                                    dBAlist.clear();
-
-                                    new Thread(new Runnable() {
-                                        public void run() {
-                                            writeSoundDataToJsonUploadJsonFile(tJsonObject);
-                                        }
-                                    }).start();
-                                }
-                            } catch (JSONException e) {
-                                e.printStackTrace();
-                            }
+                            dBSPLlist.add(dBSPL);
+                            dBAlist.add(dBA);
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
@@ -484,9 +472,6 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void run() {
                                 Button button = findViewById(R.id.startButton);
-                                progressBar.setMax(uploadNum);
-                                progressBar.setProgress(uploadCount);
-                                progressBar.setProgressTintList(ColorStateList.valueOf(Color.CYAN));
                                 button.performClick();
                             }
                         });
@@ -562,8 +547,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //amplitudes.length = bufferSize/2  -> HzPerBin = sampleRate/(2*amplitudes.length)
-    int estimateLevel(float[] amplitudes, SPL type) {
-        int dB;
+    double estimateLevel(float[] amplitudes, SPL type) {
+        double dB;
         for (int i = 0; i < amplitudes.length; i++) {
             if (amplitudes[i] == 0) amplitudes[i] = (float) Math.pow(10, -17);
         }
@@ -585,13 +570,25 @@ public class MainActivity extends AppCompatActivity {
 //            totalEnergy += (sum / amplitudes.length * 2);
         }
 
+//        for(float v : amplitudes){
+//            System.out.print(v);
+//            System.out.print(" ");
+//
+//        }
+//        System.out.println();
+
+//        Log.e("1000Hz", String.valueOf(amplitudes));
+//        Log.e("1000Hz", String.valueOf(amplitudes[100]));
+//        Log.e("1000Hz", String.valueOf(amplitudes[101]));
+
+
 //        totalEnergy = totalEnergy/((1/(double)44100)*amplitudes.length*2);
-        dB = (int) (10 * Math.log10(totalEnergy * 2500000000.0));
+        dB = (10 * Math.log10(totalEnergy * 2500000000.0));
         return dB;
     }
 
     String loadJSONFromAsset(Context context) {
-        String json = null;
+        String json;
         try {
             InputStream is = context.getAssets().open("Aweighting.json");
 
@@ -612,71 +609,96 @@ public class MainActivity extends AppCompatActivity {
         return json;
     }
 
-    void writeSoundDataToJsonUploadJsonFile(JSONObject tJsonObject) {
+    void writeSoundDataToJson(JSONObject tJsonObject) {
         // Convert JsonObject to String Format
         String userString = (tJsonObject != null) ? tJsonObject.toString() : jsonObject.toString();
-        // Define the File Path and its Name
-        int fileNum = (tJsonObject != null) ? ((runCount + 1) / runStep) : runNum / runStep;
-        File writeFile = new File(MainActivity.this.getFilesDir(), soundDataName + fileNum + ".json");
-        FileWriter fileWriter;
-        BufferedWriter bufferedWriter;
+//        File writeFile = new File(MainActivity.this.getFilesDir(), soundDataName + fileNum + ".json");
+//        FileWriter fileWriter;
+//        BufferedWriter bufferedWriter;
+//        try {
+//            fileWriter = new FileWriter(writeFile);
+//            bufferedWriter = new BufferedWriter(fileWriter);
+//            try {
+//                bufferedWriter.write(userString);
+//                bufferedWriter.close();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+
+
+        File rootFolder = MainActivity.this.getExternalFilesDir(null);
+        File jsonFile = new File(rootFolder, soundDataName + ".json");
         try {
-            fileWriter = new FileWriter(writeFile);
-            bufferedWriter = new BufferedWriter(fileWriter);
-            try {
-                bufferedWriter.write(userString);
-                bufferedWriter.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            Toast.makeText(MainActivity.this, jsonFile.toString(), Toast.LENGTH_LONG).show();
+            System.out.println(jsonFile);
+            FileWriter writer = new FileWriter(jsonFile);
+            writer.write(userString);
+            writer.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        uploadFileToFirebaseStorage(fileNum);
+
+        //or IOUtils.closeQuietly(writer);
+//        uploadFileToFirebaseStorage();
     }
 
-    void uploadFileToFirebaseStorage(final int fileNum) {
+    void uploadFileToFirebaseStorage() {
 
-        Uri readFile = Uri.fromFile(new File(MainActivity.this.getFilesDir(), soundDataName + fileNum + ".json"));
+        Uri readFile = Uri.fromFile(new File(MainActivity.this.getExternalFilesDir(null), soundDataName + ".json"));
 
         final String storageServerTimestamp = Long.toString(System.currentTimeMillis());
 
         final StorageReference soundDataRef = mStorageRef.child("SoundData/" + userID + "/" + storageServerTimestamp + ".json");
 
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                progressBar.setMax(uploadNum);
+                progressBar.setProgress(uploadCount);
+                progressBar.setProgressTintList(ColorStateList.valueOf(Color.CYAN));
+            }
+        });
+
         soundDataRef.putFile(readFile)
-//                                        .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
-//                                            @Override
-//                                            public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
-//                                                uploadCount = (int) ((double) taskSnapshot.getBytesTransferred() / (double) taskSnapshot.getTotalByteCount() * 100.0 / (runNum / runStep) * fileNum);
-//                                                runOnUiThread(new Runnable() {
-//                                                    @Override
-//                                                    public void run() {
-//                                                        progressBar.setProgress(uploadCount);
-//                                                    }
-//                                                });
-//                                            }
-//                                        })
+                .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                    @Override
+                    public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
+                        uploadCount = (int) ((double) taskSnapshot.getBytesTransferred() / (double) taskSnapshot.getTotalByteCount() * 100.0);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                progressBar.setProgress(uploadCount);
+                            }
+                        });
+                    }
+                })
                 .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
                     @Override
                     public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-//                                                uploadCount = 0;
-//                        uploadCount += (int) ((double) runStep / (double) runNum * 100.0);
-//                        runOnUiThread(new Runnable() {
-//                            @Override
-//                            public void run() {
-//                                progressBar.setProgress(uploadCount);
-//                            }
-//                        });
+
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                progressBar.setMax(initialNum);
+                                progressBar.setProgress(initialCount);
+                                progressBar.setProgressTintList(ColorStateList.valueOf(Color.BLUE));
+                            }
+                        });
+
+                        uploadCount = 0;
 
                         // Get a URL to the uploaded content
                         soundDataRef.getDownloadUrl().addOnSuccessListener(
                                 new OnSuccessListener<Uri>() {
                                     @Override
                                     public void onSuccess(Uri uri) {
-                                        Toast.makeText(getBaseContext(), "Upload success! " + fileNum, Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(getBaseContext(), "Upload success!", Toast.LENGTH_SHORT).show();
 
                                         Map<String, Object> jsonURL = new HashMap<>();
-                                        jsonURL.put(soundDataName + fileNum, uri.toString());
+                                        jsonURL.put(soundDataName, uri.toString());
                                         db.collection("Ver.1")
                                                 .document("Manufacturers")
                                                 .collection(Build.MANUFACTURER)
@@ -705,25 +727,99 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onFailure(@NonNull Exception exception) {
                         // Handle unsuccessful uploads
-                        // ...
+                        Log.e("Upload Fail!", "");
                     }
                 });
     }
 
     public JSONObject shallowCopy(JSONObject original) {
         JSONObject copy = new JSONObject();
-
         for (Iterator<String> iterator = original.keys(); iterator.hasNext(); ) {
             String key = iterator.next();
             JSONArray value = original.optJSONArray(key);
-//            Log.e("shallowCopy", key);
             try {
                 copy.put(key, value);
             } catch (JSONException e) {
-                //TODO process exception
+                e.printStackTrace();
             }
         }
         return copy;
+    }
+
+    public static class HttpURLConnection_Post_Task extends AsyncTask<String, Void, String> {
+        private final static String TAG = "HTTPURLCONNECTION test";
+        private String parameter1 = "2020-07-31";
+        private String parameter2 = "Redmi";
+        private String parameter3 = "Xiaomi";
+        private double[] parameter4 = {66.43916939577134, 67.03164334849625};
+        private String parameter5 = "mid1qqq";
+
+
+
+
+        @Override
+        protected String doInBackground(String... urls) {
+            return POST(urls[0]);
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            Log.d(TAG,"onPostExecute");
+        }
+        private String POST(String APIUrl) {
+            StringBuilder result = new StringBuilder();
+            HttpURLConnection connection;
+            try {
+                URL url = new URL(APIUrl.replaceAll(" ", "%20"));
+                connection = (HttpURLConnection)url.openConnection();
+                connection.setRequestMethod("POST");
+//                connection.setRequestProperty("Content-Type", "application/json");
+//                connection.setRequestProperty("authentication", MainActivity.this);
+                connection.setDoInput(true);
+                connection.setDoOutput(true);
+                DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
+
+//                Pattern p = Pattern.compile("[\\[\\]]");
+//                Matcher m = p.matcher(Arrays.toString(parameter4));
+//                System.out.println(m.replaceAll(""));
+                StringBuilder stringBuilder =
+                        new StringBuilder("date=" + URLEncoder.encode(parameter1, "UTF-8") + "&" +
+                                "model=" + URLEncoder.encode(parameter2, "UTF-8") + "&" +
+                                "brand=" + URLEncoder.encode(parameter3, "UTF-8") + "&" +
+                                "stamp=" + URLEncoder.encode(parameter5, "UTF-8") + "&");
+
+                for(double p : parameter4){
+                    stringBuilder.append("dBA=").append(URLEncoder.encode(String.valueOf(p), "UTF-8")).append("&");
+                }
+
+                System.out.println(stringBuilder);
+
+                outputStream.writeBytes(stringBuilder.toString());
+                outputStream.flush();
+                outputStream.close();
+
+
+                InputStream inputStream = connection.getInputStream();
+                int status = connection.getResponseCode();
+                Log.d(TAG, String.valueOf(status));
+                if(inputStream != null){
+                    InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+                    BufferedReader in = new BufferedReader(reader);
+
+                    String line="";
+                    while ((line = in.readLine()) != null) {
+                        result.append(line).append("\n");
+                    }
+                } else{
+                    result = new StringBuilder("Did not work!");
+                }
+                return result.toString();
+            } catch (Exception e) {
+//                Log.d("ATask InputStream", e.getLocalizedMessage());
+                e.printStackTrace();
+                return result.toString();
+            }
+        }
     }
 
 }

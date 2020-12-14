@@ -1,6 +1,8 @@
 <resources>
-    <string name="app_name">SLM</string>
-    <string name="start">Start</string>
-    <string name="db_spl">dB SPL</string>
+    <string name="app_name">SoundCaliber</string>
+    <string name="start">START！</string>
+    <string name="textview">TextView</string>
+    <string name="uncalibrated">Uncalibrated</string>
     <string name="dba">dBA</string>
+    <string name="stamp">Stamp</string>
 </resources>
